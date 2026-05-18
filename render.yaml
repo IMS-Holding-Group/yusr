@@ -1,10 +1,12 @@
 # Render Blueprint - Yusr (no Docker)
 # Repo: https://github.com/trsi-me/yusr
 #
-# If build fails with "requirements_minimal.txt not found":
-#   Dashboard -> yusr-api -> Settings -> Root Directory = (empty)
-#   Build Command = pip install -r backend/requirements_minimal.txt
-#   Start Command = cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+# yusr-api Settings (if not using Blueprint sync):
+#   Root Directory: (empty)
+#   Build Command:  pip install -r backend/requirements_minimal.txt
+#   Start Command:  cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+#
+# Optional persistent disk (paid): set DATABASE_PATH=/var/data/yusr.db and attach disk at /var/data
 
 services:
   - type: web
@@ -21,13 +23,9 @@ services:
       - key: FLASK_DEBUG
         value: "false"
       - key: DATABASE_PATH
-        value: /var/data/yusr.db
+        value: data/yusr.db
       - key: CORS_ORIGINS
         sync: false
-    disk:
-      name: yusr-sqlite-data
-      mountPath: /var/data
-      sizeGB: 1
 
   - type: web
     name: yusr-web

@@ -10,7 +10,9 @@ class Database:
         self._init_database()
     
     def _ensure_db_directory(self):
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        parent = os.path.dirname(os.path.abspath(self.db_path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
     
     def _init_database(self):
         conn = sqlite3.connect(self.db_path)

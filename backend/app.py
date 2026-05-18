@@ -23,8 +23,31 @@ if _cors_origins == '*':
 else:
     CORS(app, origins=[o.strip() for o in _cors_origins.split(',') if o.strip()])
 
-_default_db = os.path.join(os.path.dirname(__file__), 'data', 'yusr.db')
-db_path = os.environ.get('DATABASE_PATH', _default_db)
+def _resolve_database_path() -> str:
+    """Use DATABASE_PATH if writable; otherwise backend/data/yusr.db (Render free tier)."""
+    base_dir = os.path.dirname(__file__)
+    fallback = os.path.join(base_dir, 'data', 'yusr.db')
+    configured = os.environ.get('DATABASE_PATH', '').strip()
+    if not configured:
+        return fallback
+
+    if not os.path.isabs(configured):
+        configured = os.path.join(base_dir, configured)
+
+    parent = os.path.dirname(configured)
+    if parent:
+        try:
+            os.makedirs(parent, exist_ok=True)
+            return configured
+        except OSError as e:
+            print(f'Warning: cannot use DATABASE_PATH ({configured}): {e}')
+            print(f'Using fallback database: {fallback}')
+            return fallback
+    return configured
+
+
+db_path = _resolve_database_path()
+print(f'Database path: {db_path}')
 db = Database(db_path)
 
 @app.route('/nlu', methods=['POST'])
