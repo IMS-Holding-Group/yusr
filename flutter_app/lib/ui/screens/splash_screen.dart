@@ -4,6 +4,7 @@ import '../../src/theme/app_theme.dart';
 import '../../src/ui/screens/login_screen.dart';
 import '../../src/ui/screens/products_screen.dart';
 import '../../src/services/session_manager.dart';
+import '../../src/services/voice_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -51,6 +52,9 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
+
+    // تهيئة الصوت مبكراً حتى لا يتأخر الترحيب في الشاشة التالية
+    VoiceService().initialize();
 
     _checkSession();
   }

@@ -102,9 +102,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
     _welcomeInProgress = true;
 
     await _voiceService.speak(
-      'أهلاً بك في متجر يُسر. هل تفضّل التسوق بالوضع الصوتي أم يدوياً؟ قل: بالصوت، أو: باليد.',
+      'أهلاً بك. تسوق بالصوت أم باليد؟',
+      rate: 0.82,
     );
-    await Future.delayed(const Duration(milliseconds: 800));
 
     var attempts = 0;
     while (attempts < 2 && mounted) {
@@ -121,10 +121,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
       attempts++;
       if (attempts < 2 && mounted) {
-        await _voiceService.speak(
-          'لم أفهم إجابتك. قل بالصوت للتسوق صوتياً، أو باليد للتصفح اليدوي.',
-        );
-        await Future.delayed(const Duration(milliseconds: 600));
+        await _voiceService.speak('قل بالصوت أو باليد.', rate: 0.85);
       }
     }
 
@@ -153,13 +150,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       finish(_parseShoppingModeChoice(text));
     };
 
-    final ok = await _voiceService.startListening();
+    final ok = await _voiceService.startListening(shortAnswer: true);
     if (!ok) {
       finish(null);
       return null;
     }
 
-    Future.delayed(const Duration(seconds: 12), () {
+    Future.delayed(const Duration(seconds: 6), () {
       if (!settled) {
         _voiceService.stopListening();
         finish(null);
@@ -203,7 +200,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     });
     await _setupVoiceNavigation();
     await _voiceService.speak(
-      'تم اختيار التسوق بالصوت. يمكنك الآن قول ما تبحث عنه، أو اسم منتج، أو قول السلة لعرض السلة.',
+      'وضع الصوت مفعّل. قل ما تبحث عنه.',
+      rate: 0.8,
     );
     await _voiceNav.enableVoiceMode(announce: false);
   }
@@ -212,7 +210,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (!mounted) return;
     setState(() => _shoppingInputMode = _ShoppingInputMode.manual);
     await _voiceService.speak(
-      'تم اختيار التسوق اليدوي. يمكنك التصفح باللمس. اضغط زر الميكروفون في أي وقت لتفعيل الوضع الصوتي.',
+      'تسوق يدوي. الميكروفون متاح عند الحاجة.',
+      rate: 0.82,
     );
     await _setupVoiceNavigation();
   }

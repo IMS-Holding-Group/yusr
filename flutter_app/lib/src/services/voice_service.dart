@@ -15,6 +15,7 @@ class VoiceService {
   bool _sttInitialized = false;
   String _ttsEngine = 'flutter_tts';
   double _pitch = 1.0;
+  double _speechRate = 0.72;
   bool _callbackCalled = false;
   
   Function(String)? onSpeechResult;
@@ -22,7 +23,7 @@ class VoiceService {
   Future<void> initialize({String? ttsEngine}) async {
     _ttsEngine = ttsEngine ?? 'flutter_tts';
     await _tts.setLanguage("ar-SA");
-    await _tts.setSpeechRate(0.5);
+    await _tts.setSpeechRate(_speechRate);
     await _tts.setVolume(1.0);
     await _tts.setPitch(_pitch);
     
@@ -82,10 +83,14 @@ class VoiceService {
     return text;
   }
 
-  Future<void> speak(String text) async {
+  /// [rate] optional override (0.0–1.0). Use ~0.85 for short prompts.
+  Future<void> speak(String text, {double? rate}) async {
     if (_isSpeaking) {
       await _tts.stop();
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 150));
+    }
+    if (rate != null) {
+      await _tts.setSpeechRate(rate.clamp(0.0, 1.0));
     }
     _isSpeaking = true;
     final correctedText = _fixArabicPronunciation(text);
@@ -123,6 +128,10 @@ class VoiceService {
       );
     } catch (e) {
       _isSpeaking = false;
+    } finally {
+      if (rate != null) {
+        await _tts.setSpeechRate(_speechRate);
+      }
     }
   }
   
@@ -133,7 +142,19 @@ class VoiceService {
     }
   }
   
-  Future<bool> startListening({bool continuous = false}) async {
+  /// [shortAnswer] faster timeouts for one-word replies (e.g. بالصوت / باليد).
+  Future<bool> startListening({
+    bool continuous = false,
+    bool shortAnswer = false,
+  }) async {
+    final pauseFor = shortAnswer
+        ? const Duration(seconds: 2)
+        : const Duration(seconds: 5);
+    final listenFor = shortAnswer
+        ? const Duration(seconds: 12)
+        : const Duration(seconds: 30);
+    final idleTimeoutSeconds = shortAnswer ? 4 : 7;
+    final minPartialLength = shortAnswer ? 2 : 3;
     print('=== startListening called ===');
     
     if (!_sttInitialized) {
@@ -151,7 +172,7 @@ class VoiceService {
       await _stt.stop();
       _isListening = false;
       _callbackCalled = false;
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 200));
     }
     
     // إيقاف أي كلام جاري
@@ -159,7 +180,7 @@ class VoiceService {
       print('TTS is speaking, stopping first...');
       await _tts.stop();
       _isSpeaking = false;
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 120));
     }
     
     String? lastPartialText;
@@ -200,8 +221,11 @@ class VoiceService {
             print('Partial result: ${result.recognizedWords}');
             
             // استخدام النص الجزئي بعد فترة قصيرة إذا لم تكن هناك نتيجة نهائية
-            if (onSpeechResult != null && result.recognizedWords.length >= 3 && !_callbackCalled) {
-              Future.delayed(const Duration(seconds: 1), () {
+            if (onSpeechResult != null &&
+                result.recognizedWords.length >= minPartialLength &&
+                !_callbackCalled) {
+              final waitMs = shortAnswer ? 400 : 1000;
+              Future.delayed(Duration(milliseconds: waitMs), () {
                 if (_isListening && lastPartialText == result.recognizedWords && !_callbackCalled) {
                   print('Using partial result after 1 second: ${result.recognizedWords}');
                   _isListening = false;
@@ -214,8 +238,8 @@ class VoiceService {
         },
         localeId: "ar-SA",
         listenMode: stt.ListenMode.dictation,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 5), // وقت أطول للتعرف على الكلام العربي
+        listenFor: listenFor,
+        pauseFor: pauseFor,
         cancelOnError: false,
         partialResults: true,
         onSoundLevelChange: (level) {
@@ -232,7 +256,7 @@ class VoiceService {
       print('STT listening started successfully');
       
       // معالجة timeout بعد فترة (وقت كافٍ للتعرف على الكلام)
-      Future.delayed(const Duration(seconds: 7), () {
+      Future.delayed(Duration(seconds: idleTimeoutSeconds), () {
         if (_isListening && !_callbackCalled) {
           final timeSinceStart = DateTime.now().difference(listeningStartTime).inSeconds;
           if (lastPartialText == null || lastPartialText!.isEmpty) {
@@ -280,7 +304,8 @@ class VoiceService {
   bool get isSpeaking => _isSpeaking;
   
   Future<void> setSpeechRate(double rate) async {
-    await _tts.setSpeechRate(rate.clamp(0.0, 1.0));
+    _speechRate = rate.clamp(0.0, 1.0);
+    await _tts.setSpeechRate(_speechRate);
   }
   
   Future<void> setVolume(double volume) async {

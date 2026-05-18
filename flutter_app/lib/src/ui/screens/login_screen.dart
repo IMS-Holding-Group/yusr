@@ -49,9 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (mounted) setState(() => _voiceBusy = true);
 
     await _voiceService.speak(
-      'أهلاً بك في يُسر. هل تفضّل تسجيل الدخول بالصوت أم باليد؟ قل: بالصوت، أو: باليد.',
+      'أهلاً بك في يُسر. بالصوت أم باليد؟',
+      rate: 0.82,
     );
-    await Future.delayed(const Duration(milliseconds: 800));
 
     var attempts = 0;
     while (attempts < 2 && mounted) {
@@ -71,9 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
       attempts++;
       if (attempts < 2 && mounted) {
         await _voiceService.speak(
-          'لم أفهم إجابتك. قل بالصوت لتسجيل الدخول صوتياً، أو باليد للإدخال اليدوي.',
+          'قل بالصوت أو باليد.',
+          rate: 0.85,
         );
-        await Future.delayed(const Duration(milliseconds: 600));
       }
     }
 
@@ -103,13 +103,13 @@ class _LoginScreenState extends State<LoginScreen> {
       finish(_parseLoginModeChoice(text));
     };
 
-    final ok = await _voiceService.startListening();
+    final ok = await _voiceService.startListening(shortAnswer: true);
     if (!ok) {
       finish(null);
       return null;
     }
 
-    Future.delayed(const Duration(seconds: 12), () {
+    Future.delayed(const Duration(seconds: 6), () {
       if (!settled) {
         _voiceService.stopListening();
         finish(null);
@@ -149,7 +149,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _inputMode = _LoginInputMode.voice);
     await _voiceService.speak(
-      'تم اختيار تسجيل الدخول بالصوت. سنبدأ بإملاء البريد أو رقم الهاتف.',
+      'بالصوت. قل البريد أو الجوال.',
+      rate: 0.8,
     );
     await _dictateIdentifier();
     if (!mounted) return;
@@ -164,7 +165,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _inputMode = _LoginInputMode.manual);
     await _voiceService.speak(
-      'تم اختيار الإدخال باليد. يمكنك كتابة البريد وكلمة المرور في الحقول.',
+      'باليد. اكتب في الحقول.',
+      rate: 0.82,
     );
     if (mounted) _identifierFocus.requestFocus();
   }
@@ -174,8 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_voiceBusy && !_welcomeInProgress) return;
     if (mounted) setState(() => _voiceBusy = true);
     await _voiceService.initialize();
-    await _voiceService.speak('قل البريد الإلكتروني أو رقم الجوال');
-    await Future.delayed(const Duration(milliseconds: 2800));
+    await _voiceService.speak('قل البريد أو رقم الجوال', rate: 0.8);
+    await Future.delayed(const Duration(milliseconds: 1200));
     final prev = _voiceService.onSpeechResult;
     final completer = Completer<void>();
     var settled = false;
@@ -215,10 +217,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_voiceBusy && !_welcomeInProgress) return;
     if (mounted) setState(() => _voiceBusy = true);
     await _voiceService.initialize();
-    await _voiceService.speak(
-      'قل كلمة المرور. يُفضّل استخدام سماعة لمنع الاستماع من حولك',
-    );
-    await Future.delayed(const Duration(milliseconds: 3200));
+    await _voiceService.speak('قل كلمة المرور', rate: 0.8);
+    await Future.delayed(const Duration(milliseconds: 1400));
     final prev = _voiceService.onSpeechResult;
     final completer = Completer<void>();
     var settled = false;
