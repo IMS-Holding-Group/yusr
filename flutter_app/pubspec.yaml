@@ -1,0 +1,87 @@
+name: yusr
+description: منصة تسوق صوتية لذوي الإعاقة البصرية والحركية
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  provider: ^6.1.1
+  flutter_tts: ^4.0.2
+  speech_to_text: 7.3.0
+  shared_preferences: ^2.2.2
+  flutter_svg: ^2.0.9
+  cached_network_image: ^3.3.0
+  sqflite: ^2.3.0
+  sqflite_common_ffi_web: ^0.4.5+4
+  path: ^1.8.3
+  google_fonts: ^6.1.0
+  image: ^4.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/IPhone-16.jpg
+    - assets/images/iPhone-16-green.jpg
+    - assets/images/Sony5.jpg
+    - assets/images/Sony-headphones.jpg
+    - assets/images/nuevo-MacBook-pro.webp
+    - assets/images/Laptop.jpg
+    - assets/images/Airpods.webp
+    - assets/images/Phone.jpg
+    - assets/images/Shose.jpg
+    - assets/images/bug.webp
+    - assets/images/Coffee-machine.webp
+    - assets/images/Air-conditioner.jpeg
+    - assets/images/Washing-machine.jpg
+    - assets/images/Refrigerator.jpg
+    - assets/images/Hony.jpg
+    - assets/images/Arabic-coffee.webp
+    - assets/images/Olive-oil.jpg
+    - assets/images/Sofa.jpg
+    - assets/images/Table.jpg
+    - assets/images/Chair.webp
+    - assets/images/novel.png
+    - assets/images/Pazel.jpg
+    - assets/images/Book.png
+    - assets/images/Chess.webp
+    - assets/images/laptops.jpg
+    - assets/images/Clothing.webp
+    - assets/images/foods.jpg
+    - assets/images/games.jpg
+    - assets/images/Tablet.jpg
+    - assets/images/Charger.jpg
+    - "assets/images/Tea Master.jpg"
+    - assets/images/321.jpg
+    - assets/images/40128f8318bafaee7241f3f4c044df3a_d9f10d67-27c4-4dd3-8a48-c05c1d7f94a5.webp
+    - assets/images/71lxCY6LgVL._AC_SL1500_.jpg
+    - "assets/images/41olzVIB+lL._SL500_._AC_SL500_.jpg"
+  
+  fonts:
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/IBMPlexSansArabic-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/IBMPlexSansArabic-Light.ttf
+          weight: 300
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
+

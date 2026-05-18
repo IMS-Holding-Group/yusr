@@ -1,0 +1,53 @@
+# Render Blueprint — يُسر (بدون Docker)
+#
+# الواجهة: Static Site — تُبنى محلياً بـ scripts/build-flutter-web.ps1 ثم تُرفع مع Git
+# الخلفية: Python + gunicorn + SQLite على قرص دائم
+#
+# خطوات النشر:
+#   1) .\scripts\build-flutter-web.ps1 -ApiBaseUrl "https://yusr-api.onrender.com"
+#   2) git add deploy/dist/web && git commit && git push
+#   3) اربط المستودع في Render → Blueprint
+#   4) عيّن CORS_ORIGINS في yusr-api = رابط yusr-web
+
+services:
+  # ─── Flask API ───
+  - type: web
+    name: yusr-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements_minimal.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: DATABASE_PATH
+        value: /var/data/yusr.db
+      - key: CORS_ORIGINS
+        sync: false
+    disk:
+      name: yusr-sqlite-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  # ─── Flutter Web (Static — بدون Docker) ───
+  - type: web
+    name: yusr-web
+    runtime: static
+    rootDir: deploy/dist/web
+    buildCommand: |
+      if [ ! -f index.html ]; then
+        echo "ERROR: deploy/dist/web فارغ."
+        echo "شغّل أولاً: scripts/build-flutter-web.ps1 -ApiBaseUrl https://yusr-api.onrender.com"
+        exit 1
+      fi
+      echo "Flutter web جاهز للنشر."
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
