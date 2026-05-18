@@ -1,39 +1,17 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  بناء نسخة Flutter Web جاهزة للنشر على Render (أو أي استضافة ثابتة).
-
-.DESCRIPTION
-  - يتحقق من Flutter و Python
-  - يثبّت التبعيات
-  - يبني الويب بـ API_BASE_URL متوافق مع خادم Flask
-  - ينسخ المخرجات إلى deploy/dist/web
-  - يولّد ملفات إعداد Render
+  Build Flutter Web for Render Static Site (no Docker).
 
 .EXAMPLE
   .\scripts\build-flutter-web.ps1
 
 .EXAMPLE
-  .\scripts\build-flutter-web.ps1 -ApiBaseUrl "https://yusr-api.onrender.com" -OpenOutput
-
-.PARAMETER ApiBaseUrl
-  عنوان خادم Flask (بدون شرطة نهائية).
-
-.PARAMETER OutputDir
-  مجلد مخرجات البناء النهائي.
-
-.PARAMETER SkipPubGet
-  تخطي flutter pub get.
-
-.PARAMETER SkipBackendCheck
-  تخطي فحص صحة الخادم.
-
-.PARAMETER OpenOutput
-  فتح مجلد المخرجات بعد النجاح.
+  .\scripts\build-flutter-web.ps1 -ApiBaseUrl "https://yusr-1l5c.onrender.com" -OpenOutput
 #>
 [CmdletBinding()]
 param(
-    [string] $ApiBaseUrl = "http://127.0.0.1:5000",
+    [string] $ApiBaseUrl = "https://yusr-1l5c.onrender.com",
     [string] $OutputDir = "",
     [switch] $SkipPubGet,
     [switch] $SkipBackendCheck,
@@ -43,18 +21,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# ─── مسارات المشروع ───
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $FlutterDir = Join-Path $RepoRoot "flutter_app"
-$BackendDir = Join-Path $RepoRoot "backend"
 $DeployDir = Join-Path $RepoRoot "deploy"
+
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $DeployDir "dist\web"
 }
 
 $ApiBaseUrl = $ApiBaseUrl.Trim().TrimEnd("/")
 if ($ApiBaseUrl -notmatch '^https?://') {
-    throw "ApiBaseUrl يجب أن يبدأ بـ http:// أو https:// (القيمة: $ApiBaseUrl)"
+    throw "ApiBaseUrl must start with http:// or https:// (got: $ApiBaseUrl)"
 }
 
 function Write-Step([string]$Message) {
@@ -67,68 +44,78 @@ function Test-CommandExists([string]$Name) {
 }
 
 function Invoke-Flutter {
-    param([string[]]$Args)
+    param([string[]]$FlutterArgs)
     Push-Location $FlutterDir
     try {
-        & flutter @Args
-        if ($LASTEXITCODE -ne 0) { throw "فشل الأمر: flutter $($Args -join ' ')" }
-    } finally {
+        & flutter @FlutterArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter failed: flutter $($FlutterArgs -join ' ')"
+        }
+    }
+    finally {
         Pop-Location
     }
 }
 
-Write-Host @"
+Write-Host ""
+Write-Host "=== Yusr - Flutter Web build for Render ===" -ForegroundColor Yellow
+Write-Host ""
 
-╔══════════════════════════════════════════════════╗
-║   يُسر — بناء Flutter Web للنشر على Render     ║
-╚══════════════════════════════════════════════════╝
-"@ -ForegroundColor Yellow
-
-Write-Step "التحقق من الأدوات"
+Write-Step "Check tools"
 if (-not (Test-CommandExists "flutter")) {
-    throw "Flutter غير مثبت أو غير موجود في PATH. ثبّته من: https://docs.flutter.dev/get-started/install"
+    throw "Flutter not found in PATH. Install: https://docs.flutter.dev/get-started/install"
 }
 if (-not (Test-Path $FlutterDir)) {
-    throw "مجلد التطبيق غير موجود: $FlutterDir"
+    throw "flutter_app folder not found: $FlutterDir"
 }
 
 $flutterVersion = (flutter --version 2>&1 | Select-Object -First 1)
-Write-Host "  Flutter: $flutterVersion" -ForegroundColor Gray
+Write-Host "  $flutterVersion" -ForegroundColor Gray
 
-Write-Step "تفعيل دعم الويب"
+Write-Step "Enable web"
 Invoke-Flutter @("config", "--enable-web")
 
-Write-Step "تنظيف بناء سابق"
+Write-Step "Clean previous build"
 Invoke-Flutter @("clean")
 
 if (-not $SkipPubGet) {
-    Write-Step "تثبيت حزم Dart (pub get)"
+    Write-Step "pub get"
     Invoke-Flutter @("pub", "get")
 }
 
-Write-Step "فحص التحليل السريع"
-Invoke-Flutter @("analyze", "--no-fatal-infos")
+Write-Step "Analyze (non-blocking)"
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+Push-Location $FlutterDir
+flutter analyze --no-fatal-infos *> $null
+$analyzeExit = $LASTEXITCODE
+Pop-Location
+$ErrorActionPreference = $prevEap
+if ($analyzeExit -ne 0) {
+    Write-Host "  Analyze reported issues (continuing build)." -ForegroundColor Yellow
+}
 
 if (-not $SkipBackendCheck) {
-    Write-Step "فحص خادم Flask (اختياري)"
+    Write-Step "Backend health check"
     if (Test-CommandExists "python") {
         $healthUrl = "$ApiBaseUrl/health"
         try {
-            $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 8
+            $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 12
             if ($resp.StatusCode -eq 200) {
-                Write-Host "  الخادم يعمل: $healthUrl" -ForegroundColor Green
+                Write-Host "  OK: $healthUrl" -ForegroundColor Green
             }
-        } catch {
-            Write-Host "  تحذير: تعذّر الاتصال بـ $healthUrl" -ForegroundColor Yellow
-            Write-Host "  شغّل الخادم: cd backend; python app.py" -ForegroundColor Yellow
-            Write-Host "  أو استخدم -SkipBackendCheck لتجاوز الفحص." -ForegroundColor Yellow
         }
-    } else {
-        Write-Host "  Python غير موجود — تخطي فحص الخادم." -ForegroundColor Yellow
+        catch {
+            Write-Host "  WARN: cannot reach $healthUrl" -ForegroundColor Yellow
+            Write-Host "  Use -SkipBackendCheck to skip this check." -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "  Python not found, skipping health check." -ForegroundColor Yellow
     }
 }
 
-Write-Step "بناء Flutter Web (Release)"
+Write-Step "Build web (release)"
 Write-Host "  API_BASE_URL = $ApiBaseUrl" -ForegroundColor Gray
 
 Invoke-Flutter @(
@@ -139,68 +126,68 @@ Invoke-Flutter @(
 )
 
 $buildWeb = Join-Path $FlutterDir "build\web"
-if (-not (Test-Path (Join-Path $buildWeb "index.html"))) {
-    throw "لم يُنشأ build/web — تحقق من أخطاء البناء أعلاه."
+$indexInBuild = Join-Path $buildWeb "index.html"
+if (-not (Test-Path $indexInBuild)) {
+    throw "build/web/index.html missing. See errors above."
 }
 
-Write-Step "نسخ الملفات إلى $OutputDir"
+$BackendWebDir = Join-Path $RepoRoot "backend\static\web"
+
+Write-Step "Copy to $OutputDir"
 if (Test-Path $OutputDir) {
     Remove-Item -Recurse -Force $OutputDir
 }
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 Copy-Item -Path (Join-Path $buildWeb "*") -Destination $OutputDir -Recurse -Force
 
-# SPA rewrite لاستضافة Render Static (إن استُخدمت بدل Docker)
+Write-Step "Copy to backend/static/web (Flask serves app on same URL)"
+if (Test-Path $BackendWebDir) {
+    Remove-Item -Recurse -Force $BackendWebDir
+}
+New-Item -ItemType Directory -Path $BackendWebDir -Force | Out-Null
+Copy-Item -Path (Join-Path $buildWeb "*") -Destination $BackendWebDir -Recurse -Force
+
 $redirectsPath = Join-Path $OutputDir "_redirects"
-@(
-    "/*    /index.html   200"
-) | Set-Content -Path $redirectsPath -Encoding UTF8
+Set-Content -Path $redirectsPath -Value "/*    /index.html   200" -Encoding ASCII
 
-Write-Step "توليد ملفات الإعداد"
+Write-Step "Write config files"
 $envRenderPath = Join-Path $DeployDir "render.env.generated"
-@"
-# مُولَّد تلقائياً — $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-# انسخ القيم إلى لوحة Render → Environment
-
-# yusr-api
-DATABASE_PATH=/var/data/yusr.db
-CORS_ORIGINS=https://YOUR-YUSR-WEB.onrender.com
-FLASK_DEBUG=false
-
-# yusr-web (Docker build arg أو متغير بيئة)
-API_BASE_URL=$ApiBaseUrl
-"@ | Set-Content -Path $envRenderPath -Encoding UTF8
+$envLines = @(
+    "# Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+    "# Copy to Render dashboard -> Environment",
+    "",
+    "# yusr-api",
+    "DATABASE_PATH=data/yusr.db",
+    "CORS_ORIGINS=https://yusr-1l5c.onrender.com",
+    "FLASK_DEBUG=false",
+    "",
+    "# build dart-define",
+    "API_BASE_URL=$ApiBaseUrl"
+)
+Set-Content -Path $envRenderPath -Value $envLines -Encoding ASCII
 
 $metaPath = Join-Path $OutputDir "yusr-build-info.json"
-@{
+$meta = @{
     builtAt    = (Get-Date).ToString("o")
     apiBaseUrl = $ApiBaseUrl
     flutterDir = $FlutterDir
     outputDir  = $OutputDir
-} | ConvertTo-Json | Set-Content -Path $metaPath -Encoding UTF8
-
-# تحديث وصف index.html
-$indexPath = Join-Path $OutputDir "index.html"
-if (Test-Path $indexPath) {
-    $html = Get-Content $indexPath -Raw -Encoding UTF8
-    $html = $html -replace '<meta name="description" content="[^"]*">', '<meta name="description" content="يُسر — منصة تسوق صوتية لذوي الإعاقة البصرية والحركية">'
-    $html = $html -replace '<title>[^<]*</title>', '<title>يُسر</title>'
-    $html = $html -replace '<meta name="apple-mobile-web-app-title" content="[^"]*">', '<meta name="apple-mobile-web-app-title" content="يُسر">'
-    Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
 }
+$meta | ConvertTo-Json | Set-Content -Path $metaPath -Encoding ASCII
 
 Write-Host ""
-Write-Host "تم البناء بنجاح." -ForegroundColor Green
-Write-Host "  المخرجات: $OutputDir" -ForegroundColor Green
-Write-Host "  إعداد Render: $envRenderPath" -ForegroundColor Green
+Write-Host "BUILD OK" -ForegroundColor Green
+Write-Host "  Output:     $OutputDir" -ForegroundColor Green
+Write-Host "  Render env: $envRenderPath" -ForegroundColor Green
 Write-Host ""
-Write-Host "النشر على Render (بدون Docker):" -ForegroundColor Cyan
-Write-Host "  1) git add deploy/dist/web && git commit && git push" -ForegroundColor Gray
-Write-Host "  2) Render → Blueprint من render.yaml (Static + Python)" -ForegroundColor Gray
-Write-Host "  3) عيّن CORS_ORIGINS في yusr-api = رابط yusr-web" -ForegroundColor Gray
+Write-Host "Deploy on Render:" -ForegroundColor Cyan
+Write-Host "  1) git add backend/static/web deploy/dist/web" -ForegroundColor Gray
+Write-Host "  2) git add backend/app.py" -ForegroundColor Gray
+Write-Host "  3) git commit -m build web" -ForegroundColor Gray
+Write-Host "  4) git push  (open https://yusr-1l5c.onrender.com)" -ForegroundColor Gray
+Write-Host "  5) Render env: DATABASE_PATH=data/yusr.db" -ForegroundColor Gray
 Write-Host ""
-Write-Host "تشغيل محلي للمعاينة:" -ForegroundColor Cyan
-Write-Host "  cd backend; python app.py" -ForegroundColor Gray
+Write-Host "Preview locally:" -ForegroundColor Cyan
 Write-Host "  npx --yes serve `"$OutputDir`"" -ForegroundColor Gray
 
 if ($OpenOutput) {

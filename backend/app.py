@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, abort
 from flask_cors import CORS
 import hashlib
 import os
@@ -459,6 +459,42 @@ def login():
             'message': f'خطأ في الخادم: {str(e)}',
             'speak_text': 'حدث خطأ أثناء تسجيل الدخول'
         }), 500
+
+# Flutter Web (same Render URL as API)
+WEB_ROOT = os.path.join(os.path.dirname(__file__), 'static', 'web')
+
+
+def _web_bundle_ready() -> bool:
+    return os.path.isfile(os.path.join(WEB_ROOT, 'index.html'))
+
+
+@app.route('/')
+def serve_web_index():
+    if _web_bundle_ready():
+        return send_from_directory(WEB_ROOT, 'index.html')
+    return jsonify({
+        'status': 'api',
+        'message': 'Yusr API is running',
+        'health': '/health',
+        'hint': 'Flutter web not deployed. Run scripts/build-flutter-web.ps1 and push backend/static/web',
+    }), 200
+
+
+@app.route('/<path:path>')
+def serve_web_or_404(path):
+    # Registered after API routes; only unmatched paths reach here.
+    if path in ('health', 'nlu') or path.startswith('auth/'):
+        abort(404)
+    if not _web_bundle_ready():
+        abort(404)
+    safe = os.path.normpath(path)
+    if safe.startswith('..'):
+        abort(404)
+    full = os.path.join(WEB_ROOT, safe)
+    if os.path.isfile(full):
+        return send_from_directory(WEB_ROOT, safe)
+    return send_from_directory(WEB_ROOT, 'index.html')
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
