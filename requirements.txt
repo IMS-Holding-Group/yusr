@@ -1,0 +1,3 @@
+# Render runs from repo root if Root Directory is empty.
+# Points to the real backend dependencies.
+-r backend/requirements_minimal.txt
